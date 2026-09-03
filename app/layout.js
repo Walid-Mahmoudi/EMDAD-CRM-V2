@@ -1,8 +1,8 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'EMDAD CRM',
-  description: 'EMDAD Sales CRM',
+  title: 'Moza CRM',
+  description: 'Moza CRM - Sales Workspace',
 };
 
 export default function RootLayout({ children }) {
