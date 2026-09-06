@@ -1,0 +1,104 @@
+{
+  "name": "EMDAD - AI Inbox Intake",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "emdad-ai-inbox",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "8a4f0f6d-3f8b-4d72-9e2d-1f2d6d9f1001",
+      "name": "Inbound Event",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-760, 0],
+      "webhookId": "emdad-ai-inbox"
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $json.body ?? $json;\nreturn [{ json: { source: b.source ?? 'unknown', message_id: b.message_id ?? null, sender_name: b.sender_name ?? b.sender ?? null, sender_email: b.sender_email ?? null, subject: b.subject ?? null, received_at: b.received_at ?? new Date().toISOString(), body: b.body ?? b.text ?? '' } }];"
+      },
+      "id": "8a4f0f6d-3f8b-4d72-9e2d-1f2d6d9f1002",
+      "name": "Normalize Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-540, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }] },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ model: 'gpt-4o-mini', temperature: 0.1, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: 'You are the EMDAD sales operations AI. Analyze an inbound sales message and return ONLY JSON. Extract company, contact, project, estimated_value, project_type, category, stage, urgency, summary, next_action, next_action_date, and confidence. Do not invent facts; use null when unknown.' }, { role: 'user', content: JSON.stringify($json) }] }) }}",
+        "options": {}
+      },
+      "id": "8a4f0f6d-3f8b-4d72-9e2d-1f2d6d9f1003",
+      "name": "AI Analyze",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-300, 0],
+      "credentials": { "httpHeaderAuth": { "id": "REPLACE_OPENAI_CREDENTIAL_ID", "name": "OpenAI API Key" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const original = $('Normalize Event').first().json;\nconst raw = $json.choices?.[0]?.message?.content ?? '{}';\nlet ai;\ntry { ai = JSON.parse(raw); } catch { ai = { summary: raw }; }\nreturn [{ json: { ...original, ai_status: 'Analyzed', ai_summary: ai.summary ?? null, ai_probability: ai.confidence ?? null, extracted_company: ai.company ?? null, extracted_contact: ai.contact ?? null, extracted_project: ai.project ?? null, extracted_value: ai.estimated_value ?? null, extracted_project_type: ai.project_type ?? null, ai_category: ai.category ?? null, ai_stage: ai.stage ?? null, ai_urgency: ai.urgency ?? null, next_action: ai.next_action ?? null, next_action_date: ai.next_action_date ?? null, ai_payload: ai } }];"
+      },
+      "id": "8a4f0f6d-3f8b-4d72-9e2d-1f2d6d9f1004",
+      "name": "Prepare CRM Record",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-60, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ekvjarfxpgggimttqhli.supabase.co/rest/v1/sales_inbox",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }, { "name": "Prefer", "value": "return=representation" }] },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={{ { message_id: $json.message_id, sender_name: $json.sender_name, sender_email: $json.sender_email, subject: $json.subject, received_at: $json.received_at, body: $json.body, ai_status: $json.ai_status, ai_summary: $json.ai_summary, ai_probability: $json.ai_probability, extracted_company: $json.extracted_company, extracted_contact: $json.extracted_contact, extracted_project: $json.extracted_project, extracted_value: $json.extracted_value, extracted_project_type: $json.extracted_project_type } }}",
+        "options": {}
+      },
+      "id": "8a4f0f6d-3f8b-4d72-9e2d-1f2d6d9f1005",
+      "name": "Save to EMDAD CRM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [200, 0],
+      "credentials": { "httpHeaderAuth": { "id": "REPLACE_SUPABASE_CREDENTIAL_ID", "name": "EMDAD Supabase Service Role" } }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true, message: 'Event analyzed and stored in EMDAD CRM', summary: $('Prepare CRM Record').first().json.ai_summary, next_action: $('Prepare CRM Record').first().json.next_action, next_action_date: $('Prepare CRM Record').first().json.next_action_date } }}",
+        "options": {}
+      },
+      "id": "8a4f0f6d-3f8b-4d72-9e2d-1f2d6d9f1006",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [440, 0]
+    }
+  ],
+  "connections": {
+    "Inbound Event": { "main": [[{ "node": "Normalize Event", "type": "main", "index": 0 }]] },
+    "Normalize Event": { "main": [[{ "node": "AI Analyze", "type": "main", "index": 0 }]] },
+    "AI Analyze": { "main": [[{ "node": "Prepare CRM Record", "type": "main", "index": 0 }]] },
+    "Prepare CRM Record": { "main": [[{ "node": "Save to EMDAD CRM", "type": "main", "index": 0 }]] },
+    "Save to EMDAD CRM": { "main": [[{ "node": "Respond", "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "versionId": "emdad-ai-inbox-v1",
+  "meta": { "templateCredsSetupCompleted": false },
+  "tags": []
+}
