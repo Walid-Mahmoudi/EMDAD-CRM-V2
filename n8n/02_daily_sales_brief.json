@@ -1,0 +1,96 @@
+{
+  "name": "EMDAD - Daily AI Sales Brief",
+  "nodes": [
+    {
+      "parameters": { "rule": { "interval": [{ "field": "days", "daysInterval": 1, "triggerAtHour": 8, "triggerAtMinute": 0 }] } },
+      "id": "b4f2a1d1-9a9b-4d6e-8c7e-2001",
+      "name": "Every Morning",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-520, 0]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://ekvjarfxpgggimttqhli.supabase.co/rest/v1/deals?select=*&order=updated_at.desc",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "b4f2a1d1-9a9b-4d6e-8c7e-2002",
+      "name": "Load Open Deals",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-280, 0],
+      "credentials": { "httpHeaderAuth": { "id": "REPLACE_SUPABASE_CREDENTIAL_ID", "name": "EMDAD Supabase Service Role" } }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://ekvjarfxpgggimttqhli.supabase.co/rest/v1/ai_tasks?select=*&status=eq.Open&order=due_at.asc",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "b4f2a1d1-9a9b-4d6e-8c7e-2003",
+      "name": "Load AI Tasks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-40, 120],
+      "credentials": { "httpHeaderAuth": { "id": "REPLACE_SUPABASE_CREDENTIAL_ID", "name": "EMDAD Supabase Service Role" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const deals = $('Load Open Deals').first().json;\nconst tasks = $('Load AI Tasks').first().json;\nreturn [{ json: { deals: Array.isArray(deals) ? deals : [], tasks: Array.isArray(tasks) ? tasks : [] } }];"
+      },
+      "id": "b4f2a1d1-9a9b-4d6e-8c7e-2004",
+      "name": "Build Brief Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [200, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }] },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ model: 'gpt-4o-mini', temperature: 0.2, messages: [{ role: 'system', content: 'You are Walid\'s EMDAD sales operations assistant. Create a concise Arabic daily brief. Highlight: overdue/open AI tasks, stalled or risky deals, high-value opportunities, and the top 5 actions for today. Do not invent facts.' }, { role: 'user', content: JSON.stringify($json) }] }) }}",
+        "options": {}
+      },
+      "id": "b4f2a1d1-9a9b-4d6e-8c7e-2005",
+      "name": "Generate AI Brief",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 0],
+      "credentials": { "httpHeaderAuth": { "id": "REPLACE_OPENAI_CREDENTIAL_ID", "name": "OpenAI API Key" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = $json.choices?.[0]?.message?.content ?? '';\nreturn [{ json: { brief: text, generated_at: new Date().toISOString() } }];"
+      },
+      "id": "b4f2a1d1-9a9b-4d6e-8c7e-2006",
+      "name": "Final Brief",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 0]
+    }
+  ],
+  "connections": {
+    "Every Morning": { "main": [[{ "node": "Load Open Deals", "type": "main", "index": 0 }, { "node": "Load AI Tasks", "type": "main", "index": 0 }]] },
+    "Load Open Deals": { "main": [[{ "node": "Build Brief Input", "type": "main", "index": 0 }]] },
+    "Load AI Tasks": { "main": [[{ "node": "Build Brief Input", "type": "main", "index": 0 }]] },
+    "Build Brief Input": { "main": [[{ "node": "Generate AI Brief", "type": "main", "index": 0 }]] },
+    "Generate AI Brief": { "main": [[{ "node": "Final Brief", "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "versionId": "emdad-daily-brief-v1",
+  "meta": { "templateCredsSetupCompleted": false },
+  "tags": []
+}
