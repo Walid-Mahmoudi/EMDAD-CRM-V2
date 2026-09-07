@@ -3,12 +3,26 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="refresh" content="0; url=crm-v3.html?v=20260908">
 <title>EMDAD CRM V3</title>
-<style>body{font-family:Arial,sans-serif;padding:40px;text-align:center;color:#17202a}a{color:#c83535}</style>
+<style>body{font-family:Arial,sans-serif;padding:40px;text-align:center;color:#17202a}</style>
 </head>
 <body>
 <p>Opening EMDAD CRM V3…</p>
-<p><a href="crm-v3.html?v=20260908">Open CRM</a></p>
+<script>
+(async()=>{
+  try{
+    const r=await fetch('crm-v3.html?v=20260908-adminfix',{cache:'no-store'});
+    let html=await r.text();
+    const old="let r=await db.from('profiles').select('*').eq('id',u.id).maybeSingle();me=r.data||{id:u.id,full_name:u.email,role:'sales'};";
+    const replacement="let r=await db.rpc('get_my_profile');if(r.error||!r.data){console.error('Profile load failed',r.error);return msg('تعذر تحميل صلاحيات الحساب',true)}me=r.data;";
+    if(!html.includes(old)){
+      console.error('Admin patch target not found');
+    }else{
+      html=html.replace(old,replacement);
+    }
+    document.open();document.write(html);document.close();
+  }catch(e){document.body.innerHTML='<h3>تعذر تحميل CRM</h3><p>'+String(e.message||e)+'</p>'}
+})();
+</script>
 </body>
 </html>
