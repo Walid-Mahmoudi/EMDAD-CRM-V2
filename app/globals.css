@@ -70,3 +70,12 @@ html[data-theme="dark"] .card input,html[data-theme="dark"] .card select,html[da
 .modal-head{position:sticky;top:0;z-index:3;background:var(--card)}
 @media(max-width:1000px){.project-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.project-filters{grid-template-columns:1fr}.drawer-actions{justify-content:flex-start}}
+
+.deal{display:flex!important;align-items:flex-start;justify-content:space-between;gap:10px;width:100%;text-align:left;cursor:pointer}
+.deal-main{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.deal-main b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.deal-stage{width:100%;max-width:145px;min-height:32px;border:1px solid var(--line);border-radius:7px;background:var(--card);color:var(--ink);padding:5px 7px;font-size:10px}
+.calendar-hint{margin:8px 0;padding:9px 11px;border:1px dashed var(--line);border-radius:8px;background:var(--soft);color:var(--muted);font-size:10px}
+.contract-box{margin:10px 0;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--soft)}
+.contract-box>b{display:block;margin-bottom:8px}
+.contract-box small{color:var(--muted)}
