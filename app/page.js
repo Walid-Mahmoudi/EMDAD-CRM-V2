@@ -68,7 +68,13 @@ async function transitionProjectStatus(f){const r=await supabase.rpc('set_projec
    if(type==='quotation'){const versions=quotations.filter(q=>q.project_id===f.project_id);r=await supabase.from('quotations').insert({...f,version_no:versions.length+1,prepared_by:profile?.id||null,value:Number(f.value||0)}).select().single();}
    if(type==='collection')r=await supabase.from('collections').insert({...f,amount:Number(f.amount||0),recorded_by:profile?.id||null}).select().single();
    if(type==='contract')r=await supabase.from('contracts').insert({...f,contract_value:Number(f.contract_value||0),created_by:profile?.id||null}).select().single();
-   if(r.error)throw r.error;setModal(null);notify('Saved successfully');await load();
+   if(r.error)throw r.error;
+   const auditMap={company:['CREATE_CLIENT','Company'],contact:['CREATE_CONTACT','Contact'],project:[f.id?'UPDATE_PROJECT':'CREATE_PROJECT','Project'],followup:['CREATE_FOLLOW_UP','Follow Up'],technical:['CREATE_TECHNICAL_REQUEST','Technical Request'],quotation:['CREATE_QUOTATION','Quotation'],collection:['CREATE_COLLECTION','Collection'],contract:['CREATE_CONTRACT','Contract']};
+   const [auditAction,auditEntity]=auditMap[type]||['UPDATE','Record'];
+   const auditId=r.data?.id||f.id||null;
+   const ar=await supabase.from('audit_log').insert({actor_id:profile?.id||null,action:auditAction,entity_type:auditEntity,entity_id:auditId,details:f});
+   if(ar.error)throw ar.error;
+   setModal(null);notify('Saved successfully');await load();
   }catch(e){setError(e.message||'Save failed')}
  }
  const rows=projects.filter(p=>!search||[p.name,p.project_code,p.status].some(v=>String(v||'').toLowerCase().includes(search.toLowerCase())));
