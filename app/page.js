@@ -58,8 +58,84 @@ async function transitionProjectStatus(f){const r=await supabase.rpc('set_projec
 }
 function Auth({show,setShow,email,setEmail,password,setPassword,sent,login}){return <div className="auth"><div className="auth-card"><div className="brand-mark">E</div><small>EMDAD ENGINEERING SOLUTIONS</small><h1>EMDAD NEXUS</h1><p>Projects, pipeline, follow-ups and customer management in one workspace.</p>{!show?<button className="primary full" onClick={()=>setShow(true)}>Sign in</button>:<form onSubmit={login}><label>Work email</label><input type="email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="username" required/><label>Password</label><input type="password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password" required/><button className="primary full">Sign in</button>{sent&&<div className="success">Signed in successfully.</div>}</form>}<em>PostgreSQL · Supabase Auth · Email & Password</em></div></div>}
 function Kpi({l,v}){return <div className="kpi"><span>{l}</span><b>{v}</b></div>}
-function Dashboard({stats,projects,followups,setPage,setSelected}){return <><Head ey="SALES COMMAND CENTER" title="Dashboard" sub="Live overview of your commercial workspace." action={<button className="primary" onClick={()=>setPage('projects')}>＋ New Project</button>}/><div className="kpis"><Kpi l="Total Projects" v={stats.total}/><Kpi l="Open Pipeline" v={stats.open}/><Kpi l="Won Projects" v={stats.won}/><Kpi l="Contract Value" v={money(stats.contract)+' EGP'}/></div><div className="grid2"><div className="card"><div className="card-head"><b>Pipeline snapshot</b><span>{projects.length} projects</span></div>{Object.entries(statusLabel).map(([k,v])=>{let n=projects.filter(p=>p.status===k).length;if(!n)return null;return <div className="bar" key={k}><span>{v}</span><div><i style={{width:Math.max(4,n/projects.length*100)+'%'}}/></div><b>{n}</b></div>})}{!projects.length&&<Empty text="No projects yet."/>}</div><div className="card"><div className="card-head"><b>Upcoming follow-ups</b><span>{followups.length}</span></div>{followups.slice(0,6).map(f=><div className="row" key={f.id}><div><b>{date(f.follow_up_date)}</b><span>{f.follow_up_type?.replaceAll('_',' ')}</span></div><em>{f.next_action||f.result||'No result'}</em></div>)}{!followups.length&&<Empty text="No follow-ups yet."/>}</div></div><div className="card"><div className="card-head"><b>Recent projects</b><span>Open a project for details</span></div>{projects.slice(0,7).map(p=><button className="project-row" key={p.id} onClick={()=>setSelected(p)}><div><b>{p.name}</b><span>{p.project_code||'No code'}</span></div><strong>{statusLabel[p.status]}</strong></button>)}{!projects.length&&<Empty text="No projects."/>}</div></>}
-function Head({ey,title,sub,action}){return <div className="head"><div><small>{ey}</small><h1>{title}</h1><p>{sub}</p></div>{action}</div>}
+function Dashboard({stats,projects,followups,setPage,setSelected}) {
+  const active=projects.filter(p=>!['won','lost','cancelled'].includes(p.status));
+  const won=projects.filter(p=>p.status==='won');
+  const lost=projects.filter(p=>p.status==='lost');
+  const est=active.reduce((s,p)=>s+Number(p.estimated_value||0),0);
+  const contractValue=won.reduce((s,p)=>s+Number(p.contract_value||0),0);
+  const collected=stats.collected||0;
+  const remaining=Math.max(0,contractValue-collected);
+  const collectionPct=contractValue?Math.min(100,collected/contractValue*100):0;
+  const today=new Date(); today.setHours(0,0,0,0);
+  const dayKey=v=>{if(!v)return null;const d=new Date(v);if(isNaN(d))return null;d.setHours(0,0,0,0);return d.getTime()};
+  const todayKey=today.getTime();
+  const pending=f=>!f.result;
+  const todayFU=followups.filter(f=>pending(f)&&dayKey(f.next_action_date)===todayKey).length;
+  const overdueFU=followups.filter(f=>pending(f)&&dayKey(f.next_action_date)!==null&&dayKey(f.next_action_date)<todayKey).length;
+  const upcomingFU=followups.filter(f=>pending(f)&&dayKey(f.next_action_date)!==null&&dayKey(f.next_action_date)>todayKey).length;
+  const noNext=active.filter(p=>!p.next_follow_up_date).length;
+  const ageSinceTouch=p=>{const base=p.updated_at||p.created_at;if(!base)return 999;const d=new Date(base);if(isNaN(d))return 999;d.setHours(0,0,0,0);return Math.max(0,Math.floor((today-d)/86400000));};
+  const stale=active.filter(p=>ageSinceTouch(p)>14);
+  const overdueIds=new Set(followups.filter(f=>pending(f)&&dayKey(f.next_action_date)!==null&&dayKey(f.next_action_date)<todayKey).map(f=>String(f.project_id)));
+  const atRisk=active.filter(p=>overdueIds.has(String(p.id))||ageSinceTouch(p)>14||!p.next_follow_up_date);
+  const weightedForecast=active.reduce((s,p)=>s+Number(p.estimated_value||0)*(Number(p.win_probability||0)/100),0);
+  const coverage=est?weightedForecast/est*100:0;
+  const stageData=[
+    {label:'Tender',arr:active.filter(p=>p.project_type==='tender_in_market'&&!((Number(p.win_probability||0)>50))),key:'tender'},
+    {label:'Tender – High Probability',arr:active.filter(p=>p.project_type==='tender_in_market'&&Number(p.win_probability||0)>50),key:'tender-high'},
+    {label:'In Hand',arr:active.filter(p=>p.project_type==='in_hand'),key:'in-hand'},
+    {label:'Negotiation',arr:active.filter(p=>p.status==='negotiation'),key:'negotiation'},
+    {label:'Closed Won',arr:won,key:'won'},
+    {label:'Closed Lost',arr:lost,key:'lost'}
+  ].map(x=>({...x,value:x.arr.reduce((s,p)=>s+Number(x.key==='won'?p.contract_value||0:p.estimated_value||0),0),count:x.arr.length}));
+  const maxCount=Math.max(1,...stageData.map(x=>x.count));
+  const top=[...active].sort((a,b)=>Number(b.estimated_value||0)-Number(a.estimated_value||0)).slice(0,6);
+  const recent=[...followups].sort((a,b)=>new Date(b.follow_up_date||0)-new Date(a.follow_up_date||0)).slice(0,6);
+  const monthly=Array.from({length:6},(_,i)=>{const d=new Date(today.getFullYear(),today.getMonth()-(5-i),1);const next=new Date(d.getFullYear(),d.getMonth()+1,1);const n=followups.filter(f=>{const x=new Date(f.follow_up_date||0);return x>=d&&x<next}).length;return {label:d.toLocaleDateString('en-GB',{month:'short'}),n};});
+  const actions=[
+    {label:'Overdue Follow-ups',value:overdueFU,sub:'Follow-ups past due',cls:'danger',go:'followups'},
+    {label:'Today',value:todayFU,sub:'Follow-ups due today',go:'followups'},
+    {label:'No Next Action',value:noNext,sub:'Active projects without a next date',go:'projects'},
+    {label:'Stale Opportunities',value:stale.length,sub:'No touch for more than 14 days',go:'projects'}
+  ];
+  return <div className="legacyDash">
+    <div className="legacyHero">
+      <div><div className="legacyEyebrow">EMDADIX CRM · EXECUTIVE COMMAND CENTER</div><h2>Dashboard</h2><p>What happened · What needs action · Where the money is</p></div>
+      <div className="legacyQuick"><button className="primary" onClick={()=>setPage('projects')}>＋ Add Project</button><button className="secondary" onClick={()=>setPage('followups')}>◷ Follow Up</button><button className="secondary" onClick={()=>setPage('collections')}>₤ Collections</button></div>
+    </div>
+    <div className="legacyKpiGrid">
+      <div className="legacyKpi"><div className="legacyKpiHead"><span>Open Pipeline</span><i>◎</i></div><b>{money(est)}</b><small>{active.length} active opportunities</small></div>
+      <div className="legacyKpi"><div className="legacyKpiHead"><span>Contract Value</span><i>▣</i></div><b>{money(contractValue)}</b><small>{won.length} deals done</small></div>
+      <div className="legacyKpi"><div className="legacyKpiHead"><span>Weighted Forecast</span><i>◈</i></div><b>{money(weightedForecast)}</b><small>{coverage.toFixed(1)}% of open pipeline</small></div>
+      <div className="legacyKpi"><div className="legacyKpiHead"><span>Collected</span><i>₤</i></div><b>{money(collected)}</b><small>{collectionPct.toFixed(1)}% collected · {money(remaining)} remaining</small></div>
+    </div>
+    <div className="legacyGridMain">
+      <div className="legacyPanel"><div className="legacyPanelHead"><div><h3>Sales Pipeline</h3><small>Click a stage to inspect its projects</small></div><button className="secondary small" onClick={()=>setPage('pipeline')}>Open Pipeline</button></div><div className="legacyPipeline">{stageData.map(s=><button className="legacyPipeStage" key={s.key} onClick={()=>setPage('pipeline')}><div><b>{s.label}</b><span>{s.count}</span></div><strong>{money(s.value)}</strong><i><em style={{width:Math.round(s.count/maxCount*100)+'%'}}/></i></button>)}</div></div>
+      <div className="legacyPanel"><div className="legacyPanelHead"><div><h3>Action Center</h3><small>Items requiring attention</small></div><span className={'legacyHealth '+(atRisk.length?'warn':'ok')}>{atRisk.length?'Needs Attention':'Healthy'}</span></div><div className="legacyActions">{actions.map(a=><button className={'legacyAction '+(a.cls||'')} key={a.label} onClick={()=>setPage(a.go)}><i>{a.value}</i><div><b>{a.label}</b><small>{a.sub}</small></div><span>›</span></button>)}</div></div>
+    </div>
+    <div className="legacyCharts">
+      <div className="legacyPanel"><div className="legacyPanelHead"><div><h3>Sales Momentum</h3><small>Live monthly activity · latest 6 months</small></div><span className="legacyHealth ok">Live</span></div><div className="legacyBars">{monthly.map(m=><div key={m.label}><span>{m.label}</span><i><em style={{height:Math.max(8,m.n?m.n/Math.max(1,...monthly.map(x=>x.n))*100:8)+'%'}}/></i><b>{m.n}</b></div>)}</div><div className="legacyChartNote">Real CRM follow-up records</div></div>
+      <div className="legacyPanel"><div className="legacyPanelHead"><div><h3>Pipeline Mix</h3><small>Projects across the sales journey</small></div><span className="legacyHealth ok">Live</span></div><div className="legacyMix">{stageData.map(s=><div key={s.key}><span>{s.label}</span><div><i style={{width:Math.round((s.value/Math.max(1,est+contractValue))*100)+'%'}}/></div><b>{s.count}</b></div>)}</div></div>
+    </div>
+    <div className="legacyExecutive">
+      <div><span>Activity Pulse</span><b>{followups.length}</b><small>Total follow-up records</small></div>
+      <div><span>Open Opportunities</span><b>{active.length}</b><small>{money(est)} active value</small></div>
+      <div><span>Pipeline Velocity</span><b>{projects.length}</b><small>Projects across all stages</small></div>
+      <div><span>Collection Progress</span><b>{collectionPct.toFixed(1)}%</b><small>{money(collected)} received</small></div>
+    </div>
+    <div className="legacyPanel"><div className="legacyPanelHead"><div><h3>Pipeline Funnel</h3><small>Value concentration across the sales journey</small></div><button className="secondary small" onClick={()=>setPage('pipeline')}>Open Pipeline</button></div><div className="legacyFunnel">{stageData.map(s=><div key={s.key}><span>{s.label}</span><i><em style={{width:Math.round((s.value/Math.max(1,est+contractValue))*100)+'%'}}/></i><b>{money(s.value)}</b></div>)}</div></div>
+    <div className="legacyGrid3">
+      <div className="legacyPanel"><div className="legacyPanelHead"><div><h3>Pipeline Health</h3><small>Operational health of active opportunities</small></div><span className={'legacyHealth '+(atRisk.length?'warn':'ok')}>{Math.max(0,active.length-atRisk.length)} healthy</span></div><div className="legacyHealthGrid"><div><span>Active Pipeline</span><b>{active.length}</b><small>{money(est)}</small></div><div><span>At Risk</span><b>{atRisk.length}</b><small>{money(atRisk.reduce((s,p)=>s+Number(p.estimated_value||0),0))}</small></div><div><span>Stale</span><b>{stale.length}</b><small>14+ days</small></div><div><span>Coverage</span><b>{coverage.toFixed(1)}%</b><small>Weighted / open</small></div></div></div>
+      <div className="legacyPanel"><div className="legacyPanelHead"><div><h3>Collections</h3><small>Commercial snapshot</small></div><button className="secondary small" onClick={()=>setPage('collections')}>Open</button></div><div className="legacyMoney"><span>Contracted</span><b>{money(contractValue)}</b></div><div className="legacyMoney"><span>Collected</span><b>{money(collected)}</b></div><div className="legacyMoney"><span>Remaining</span><b>{money(remaining)}</b></div><div className="legacyProgress"><i style={{width:collectionPct+'%'}}/></div></div>
+    </div>
+    <div className="legacyGrid2">
+      <div className="legacyPanel"><div className="legacyPanelHead"><div><h3>Top Active Opportunities</h3><small>Highest estimated values</small></div><button className="secondary small" onClick={()=>setPage('projects')}>All Projects</button></div>{top.length?top.map(p=><button className="legacyOpportunity" key={p.id} onClick={()=>setSelected(p)}><div><small>{p.project_code||'PROJECT'}</small><b>{p.name||'-'}</b><span>{projects.find(x=>x.id===p.id)?.company_id ? 'Active opportunity' : '—'}</span></div><div><em>{statusLabel[p.status]||p.status}</em><strong>{money(p.estimated_value)}</strong><small>{p.next_follow_up_date?'Next: '+date(p.next_follow_up_date):'No next action'}</small></div></button>):<Empty text="No active opportunities."/>}</div>
+      <div className="legacyPanel"><div className="legacyPanelHead"><div><h3>Recent Activity</h3><small>Latest follow-up touchpoints</small></div></div>{recent.length?recent.map(f=>{const p=projects.find(x=>x.id===f.project_id);return <button className="legacyRecent" key={f.id} onClick={()=>p&&setSelected(p)}><i>◷</i><div><b>{p?.name||f.project_id||'-'}</b><small>{date(f.follow_up_date)} · {f.follow_up_type?.replaceAll('_',' ')} · {f.result||'-'}</small></div></button>}):<Empty text="No recent activity."/>}</div>
+    </div>
+    <div className="legacyFooterStats"><div><span>Focus Projects</span><b>{active.filter(p=>Number(p.win_probability||0)>50).length}</b><small>{money(active.filter(p=>Number(p.win_probability||0)>50).reduce((s,p)=>s+Number(p.estimated_value||0),0))}</small></div><div><span>Upcoming Follow-ups</span><b>{upcomingFU}</b><small>Future scheduled actions</small></div><div><span>Deals Done</span><b>{won.length}</b><small>{money(contractValue)}</small></div><div><span>Collection Rate</span><b>{collectionPct.toFixed(1)}%</b><small>{money(collected)} received</small></div></div>
+  </div>
+}\nfunction Head({ey,title,sub,action}){return <div className="head"><div><small>{ey}</small><h1>{title}</h1><p>{sub}</p></div>{action}</div>}
 function Projects({rows,companies,setModal,setSelected,onArchive,onEdit}){return <><Head ey="CRM CORE" title="Projects" sub="Projects remain the center of the commercial workflow." action={<button className="primary" onClick={()=>setModal('project')}>＋ New Project</button>}/><div className="card table"><div className="card-head"><b>{rows.length} projects</b><span>Project → technical → pricing → quotation → follow-up</span></div><table><thead><tr><th>Project</th><th>Client</th><th>Type</th><th>Stage</th><th>Estimated</th><th>Probability</th><th></th></tr></thead><tbody>{rows.map(p=><tr key={p.id} onClick={()=>setSelected(p)}><td><b>{p.name}</b><small>{p.project_code||'—'}</small></td><td>{companies.find(c=>c.id===p.company_id)?.name||'—'}</td><td>{typeLabel[p.project_type]}</td><td><label className="badge">{statusLabel[p.status]}</label></td><td>{money(p.estimated_value)} {p.currency}</td><td>{p.win_probability||0}%</td><td><button className="secondary small" onClick={e=>{e.stopPropagation();onEdit(p)}}>Edit</button> <button className="secondary small" onClick={e=>{e.stopPropagation();onArchive(p).catch(x=>setError(x.message))}}>Archive</button></td></tr>)}</tbody></table>{!rows.length&&<Empty text="No projects found."/>}</div></>}
 function Pipeline({rows,setSelected}){const lost=rows.filter(p=>p.status==='lost');const stages=Object.keys(statusLabel);return <><Head ey="COMMERCIAL WORKFLOW" title="Pipeline" sub="Stage view of the live project workflow."/><div className="kanban">{stages.map(s=><div className="lane" key={s}><div className="lane-head"><b>{statusLabel[s]}</b><span>{rows.filter(p=>p.status===s).length}</span></div>{rows.filter(p=>p.status===s).map(p=><button className="deal" key={p.id} onClick={()=>setSelected(p)}><b>{p.name}</b><span>{p.project_code||'No code'}</span><small>{money(p.estimated_value)} {p.currency}</small></button>)}</div>)}</div></>}
 function Companies({companies,contacts,setModal}){return <><Head ey="CUSTOMER MASTER" title="Clients & Contacts" sub="Company and contact records linked to projects." action={<div><button className="secondary" onClick={()=>setModal('contact')}>＋ Contact</button> <button className="primary" onClick={()=>setModal('company')}>＋ Client</button></div>}/><div className="grid2"><ListCard title="Clients" count={companies.length} rows={companies.map(c=><div className="entity" key={c.id}><div className="entity-icon">{c.name?.[0]}</div><div><b>{c.name}</b><span>{c.industry||'No industry'} · {c.city||'No city'}</span></div></div>)} /><ListCard title="Contacts" count={contacts.length} rows={contacts.map(c=><div className="entity" key={c.id}><div className="entity-icon">C</div><div><b>{c.name}</b><span>{c.job_title||'Contact'}</span></div></div>)}/></div></>}
