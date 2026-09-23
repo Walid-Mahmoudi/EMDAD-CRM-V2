@@ -55,3 +55,18 @@ html[data-theme="dark"] .legacyHero,html[data-theme="dark"] .legacyPanel,html[da
 .small{padding:7px 10px!important;font-size:10px!important}
 @media(max-width:800px){.grid{grid-template-columns:1fr}}
 html[data-theme="dark"] .card input,html[data-theme="dark"] .card select,html[data-theme="dark"] .card textarea{background:var(--card);color:var(--ink);border-color:var(--line)}
+
+.drawer-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.drawer-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap;justify-content:flex-end}
+.drawer-close{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;width:34px;height:34px;font-size:20px;cursor:pointer}
+.danger-btn{border-color:#e8b7b7!important;color:#b42318!important}
+.legacyDash{max-width:1500px;margin:0 auto}
+.project-filters{display:grid!important;grid-template-columns:minmax(260px,2fr) repeat(4,minmax(140px,1fr));gap:12px}
+.project-filters label{min-width:0}
+.project-filters input,.project-filters select{margin-top:6px}
+.card-tabs{margin-bottom:14px}
+.card-tabs button{font-weight:700}
+.modal{max-height:90vh;overflow:auto}
+.modal-head{position:sticky;top:0;z-index:3;background:var(--card)}
+@media(max-width:1000px){.project-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.project-filters{grid-template-columns:1fr}.drawer-actions{justify-content:flex-start}}
