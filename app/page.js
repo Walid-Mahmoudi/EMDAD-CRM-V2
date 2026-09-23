@@ -72,9 +72,9 @@ async function transitionProjectStatus(f){const r=await supabase.rpc('set_projec
 function Auth({show,setShow,email,setEmail,password,setPassword,sent,login}){return <div className="auth"><div className="auth-card"><div className="brand-mark">E</div><small>EMDAD ENGINEERING SOLUTIONS</small><h1>EMDAD NEXUS</h1><p>Projects, pipeline, follow-ups and customer management in one workspace.</p>{!show?<button className="primary full" onClick={()=>setShow(true)}>Sign in</button>:<form onSubmit={login}><label>Work email</label><input type="email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="username" required/><label>Password</label><input type="password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password" required/><button className="primary full">Sign in</button>{sent&&<div className="success">Signed in successfully.</div>}</form>}<em>PostgreSQL · Supabase Auth · Email & Password</em></div></div>}
 function Kpi({l,v}){return <div className="kpi"><span>{l}</span><b>{v}</b></div>}
 function Dashboard({stats,projects,followups,setPage,setSelected}) {
-  const active=projects.filter(p=>!['won','lost','cancelled'].includes(p.status));
-  const won=projects.filter(p=>p.status==='won');
-  const lost=projects.filter(p=>p.status==='lost');
+  const active=projects.filter(p=>!['Closed Won','Closed Lost'].includes(legacyStage(p)));
+  const won=projects.filter(p=>legacyStage(p)==='Closed Won');
+  const lost=projects.filter(p=>legacyStage(p)==='Closed Lost');
   const est=active.reduce((s,p)=>s+Number(p.estimated_value||0),0);
   const contractValue=won.reduce((s,p)=>s+Number(p.contract_value||0),0);
   const collected=stats.collected||0;
@@ -87,11 +87,12 @@ function Dashboard({stats,projects,followups,setPage,setSelected}) {
   const todayFU=followups.filter(f=>pending(f)&&dayKey(f.next_action_date)===todayKey).length;
   const overdueFU=followups.filter(f=>pending(f)&&dayKey(f.next_action_date)!==null&&dayKey(f.next_action_date)<todayKey).length;  const upcomingFU=followups.filter(f=>pending(f)&&dayKey(f.next_action_date)!==null&&dayKey(f.next_action_date)>todayKey).length;
   const noNext=active.filter(p=>!p.next_follow_up_date).length;
-  const ageSinceTouch=p=>{const base=p.updated_at||p.created_at;if(!base)return 999;const d=new Date(base);if(isNaN(d))return 999;d.setHours(0,0,0,0);return Math.max(0,Math.floor((today-d)/86400000));};
+  const ageSinceTouch=p=>{const base=p.last_follow_up_date||p.created_at||p.opportunity_date;if(!base)return 999;const d=new Date(base);if(isNaN(d))return 999;d.setHours(0,0,0,0);return Math.max(0,Math.floor((today-d)/86400000));};
   const stale=active.filter(p=>ageSinceTouch(p)>14);
   const overdueIds=new Set(followups.filter(f=>pending(f)&&dayKey(f.next_action_date)!==null&&dayKey(f.next_action_date)<todayKey).map(f=>String(f.project_id)));
   const atRisk=active.filter(p=>overdueIds.has(String(p.id))||ageSinceTouch(p)>14||!p.next_follow_up_date);
-  const weightedForecast=active.reduce((s,p)=>s+Number(p.estimated_value||0)*(Number(p.win_probability||0)/100),0);
+  const stageWeights={Tender:.10,'Tender – High Probability':.30,'In Hand':.60,Negotiation:.80};
+  const weightedForecast=active.reduce((s,p)=>s+Number(p.estimated_value||0)*(stageWeights[legacyStage(p)]||0),0);
   const coverage=est?weightedForecast/est*100:0;
   const stageData=legacyStages.map(stage=>{
     const arr=projects.filter(p=>legacyStage(p)===stage);
@@ -148,7 +149,7 @@ function Projects({rows,companies,setModal,setSelected,onArchive,onEdit}){
  const [tab,setTab]=useState('active'),[stage,setStage]=useState('all'),[type,setType]=useState('all'),[location,setLocation]=useState('all'),[sort,setSort]=useState('updated'),[q,setQ]=useState('');
  const activeStages=['Tender','Tender – High Probability','In Hand','Negotiation'];
  const active=rows.filter(p=>activeStages.includes(legacyStage(p))),lost=rows.filter(p=>legacyStage(p)==='Closed Lost'),won=rows.filter(p=>legacyStage(p)==='Closed Won');
- const focus=active.filter(p=>Number(p.win_probability||0)>50);
+ const focus=active.filter(p=>['Tender – High Probability','In Hand','Negotiation'].includes(legacyStage(p)));
  const source=tab==='lost'?lost:tab==='focus'?focus:active;
  const locations=[...new Set(source.map(p=>p.city||p.location).filter(Boolean))].sort();
  const filtered=source.filter(p=>{
@@ -218,14 +219,15 @@ function Reports({stats,projects,companies,collections,followups,exportCSV}){
  const inRange=v=>{if(!v)return false;const d=new Date(v);if(from&&d<new Date(from+'T00:00:00'))return false;if(to&&d>new Date(to+'T23:59:59'))return false;return true};
  const filteredProjects=projects.filter(p=>(!from&&!to)||inRange(p.created_at));
  const won=filteredProjects.filter(p=>p.status==='won'),lost=filteredProjects.filter(p=>p.status==='lost');
- const open=filteredProjects.filter(p=>!['won','lost','cancelled'].includes(p.status));
+ const open=filteredProjects.filter(p=>!['Closed Won','Closed Lost'].includes(legacyStage(p)));
  const pipelineValue=open.reduce((s,p)=>s+Number(p.estimated_value||0),0);
- const weighted=open.reduce((s,p)=>s+Number(p.estimated_value||0)*Number(p.win_probability||0)/100,0);
- const projectReport=filteredProjects.map(p=>({Project_ID:p.project_code||p.id,Project:p.name,Stage:statusLabel[p.status]||p.status,Type:typeLabel[p.project_type]||p.project_type,Location:p.city||p.location||'',Estimated_Value:p.estimated_value||0,Win_Probability:p.win_probability||0,Next_Follow_Up:p.next_follow_up_date||''}));
+ const stageWeights={Tender:.10,'Tender – High Probability':.30,'In Hand':.60,Negotiation:.80};
+ const weighted=open.reduce((s,p)=>s+Number(p.estimated_value||0)*(stageWeights[legacyStage(p)]||0),0);
+ const projectReport=filteredProjects.map(p=>({Project_ID:p.project_code||p.id,Project:p.name,Stage:legacyStage(p),Type:typeLabel[p.project_type]||p.project_type,Location:p.city||p.location||'',Estimated_Value:p.estimated_value||0,Win_Probability:p.win_probability||0,Next_Follow_Up:p.next_follow_up_date||''}));
  const pipelineReport=open.map(p=>({Project:p.name,Stage:statusLabel[p.status]||p.status,Estimated_Value:p.estimated_value||0,Win_Probability:p.win_probability||0,Weighted_Value:(Number(p.estimated_value||0)*Number(p.win_probability||0)/100)}));
- const focus=filteredProjects.filter(p=>Number(p.win_probability||0)>50&& !['won','lost','cancelled'].includes(p.status));
+ const focus=filteredProjects.filter(p=>['Tender – High Probability','In Hand','Negotiation'].includes(legacyStage(p)));
  const followupReport=followups.filter(f=>(!from&&!to)||inRange(f.follow_up_date)).map(f=>({Date:f.follow_up_date,Project:projects.find(p=>p.id===f.project_id)?.name||'—',Type:f.follow_up_type?.replaceAll('_',' ')||'—',Result:f.result||'Pending',Next_Action:f.next_action||'—',Next_Action_Date:f.next_action_date||'—'}));
- const clientReport=companies.map(c=>{const ps=filteredProjects.filter(p=>p.company_id===c.id);return {Client:c.name,Projects:ps.length,Open:ps.filter(p=>!['won','lost','cancelled'].includes(p.status)).length,Won:ps.filter(p=>p.status==='won').length,Estimated_Value:ps.reduce((s,p)=>s+Number(p.estimated_value||0),0),Contract_Value:ps.reduce((s,p)=>s+Number(p.contract_value||0),0)}}).filter(x=>x.Projects);
+ const clientReport=companies.map(c=>{const ps=filteredProjects.filter(p=>p.company_id===c.id);return {Client:c.name,Projects:ps.length,Open:ps.filter(p=>!['Closed Won','Closed Lost'].includes(legacyStage(p))).length,Won:ps.filter(p=>legacyStage(p)==='Closed Won').length,Estimated_Value:ps.reduce((s,p)=>s+Number(p.estimated_value||0),0),Contract_Value:ps.reduce((s,p)=>s+Number(p.contract_value||0),0)}}).filter(x=>x.Projects);
  const print=()=>window.print();
  const download=(name,rows)=>exportCSV(name,rows);
  const tabs=[['projects','Projects Report'],['pipeline','Pipeline Report'],['focus','Focus Projects'],['followups','Follow-Up Report'],['finance','Contracts & Collections'],['clients','Client Report']];
