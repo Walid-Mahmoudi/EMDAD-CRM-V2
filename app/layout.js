@@ -1,14 +1,3 @@
 import './globals.css';
-
-export const metadata = {
-  title: 'Moza CRM',
-  description: 'Moza CRM - Sales Workspace',
-};
-
-export default function RootLayout({ children }) {
-  return (
-    <html lang="en">
-      <body>{children}</body>
-    </html>
-  );
-}
+export const metadata={title:'EMDAD NEXUS',description:'EMDAD Engineering Solutions CRM'};
+export default function RootLayout({children}){return <html lang="en"><body>{children}</body></html>}
