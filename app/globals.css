@@ -37,3 +37,21 @@ html[dir="rtl"] body{font-family:Tahoma,Arial,sans-serif}html[dir="rtl"] .sideba
 @media(max-width:700px){.legacyHero{align-items:flex-start;flex-direction:column}.legacyQuick{justify-content:flex-start}.legacyKpiGrid{grid-template-columns:1fr 1fr}.legacyPipeline{grid-template-columns:1fr 1fr}.legacyActions{grid-template-columns:1fr}.legacyHealthGrid{grid-template-columns:1fr 1fr}.legacyExecutive,.legacyFooterStats{grid-template-columns:1fr 1fr}.legacyFunnel>div{grid-template-columns:85px 1fr 78px}}
 @media(max-width:480px){.legacyKpiGrid{grid-template-columns:1fr}.legacyPipeline{grid-template-columns:1fr}.legacyHero h2{font-size:20px}.legacyQuick button{flex:1}.legacyHealthGrid{grid-template-columns:1fr 1fr}.legacyOpportunity{gap:7px}.legacyOpportunity>div:last-child{min-width:105px}.legacyExecutive,.legacyFooterStats{grid-template-columns:1fr}}
 html[data-theme="dark"] .legacyHero,html[data-theme="dark"] .legacyPanel,html[data-theme="dark"] .legacyKpi,html[data-theme="dark"] .legacyExecutive>div,html[data-theme="dark"] .legacyFooterStats>div{background:var(--card);color:var(--ink)}
+
+/* UI foundation / legacy parity */
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
+.grid>.card{min-width:0}
+.card h3{margin:0 0 14px;font-size:14px}
+.card input,.card select,.card textarea{width:100%;min-height:40px;border:1px solid var(--line);border-radius:8px;margin-top:5px;padding:8px 10px;outline:0;background:var(--card);color:var(--ink);font-size:12px}
+.card textarea{min-height:90px;resize:vertical}
+.card label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bottom:10px}
+.checkline{display:flex!important;align-items:center;gap:8px;color:var(--ink)!important;font-size:11px!important;font-weight:600!important}
+.checkline input{width:16px!important;min-height:16px!important;margin:0!important;accent-color:var(--red)}
+.settings-actions{display:flex;justify-content:flex-end;margin-top:8px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tabs button{border:1px solid var(--line);background:var(--card);color:var(--muted);border-radius:8px;padding:8px 11px;font-size:10px}
+.tabs button.active{background:var(--red);border-color:var(--red);color:#fff}
+.muted{color:var(--muted)}
+.small{padding:7px 10px!important;font-size:10px!important}
+@media(max-width:800px){.grid{grid-template-columns:1fr}}
+html[data-theme="dark"] .card input,html[data-theme="dark"] .card select,html[data-theme="dark"] .card textarea{background:var(--card);color:var(--ink);border-color:var(--line)}
