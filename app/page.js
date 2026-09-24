@@ -150,7 +150,7 @@ function Dashboard({stats,projects,followups,setPage,setSelected}) {
   ];
   return <div className="legacyDash">
     <div className="legacyHero">
-      <div><div className="legacyEyebrow">EMDADIX CRM · EXECUTIVE COMMAND CENTER</div><h2>Dashboard</h2><p>What happened · What needs action · Where the money is</p></div>
+      <div><div className="legacyEyebrow">EMDAD NEXUS CRM · EXECUTIVE COMMAND CENTER</div><h2>Dashboard</h2><p>What happened · What needs action · Where the money is</p></div>
       <div className="legacyQuick"><button className="primary" onClick={()=>setPage('projects')}>＋ Add Project</button><button className="secondary" onClick={()=>setPage('followups')}>◷ Follow Up</button><button className="secondary" onClick={()=>setPage('collections')}>₤ Collections</button></div>
     </div>
     <div className="legacyKpiGrid">
@@ -627,7 +627,7 @@ function Dashboard({stats,projects,followups,setPage,setSelected}) {
   ];
   return <div className="legacyDash">
     <div className="legacyHero">
-      <div><div className="legacyEyebrow">EMDADIX CRM · EXECUTIVE COMMAND CENTER</div><h2>Dashboard</h2><p>What happened · What needs action · Where the money is</p></div>
+      <div><div className="legacyEyebrow">EMDAD NEXUS CRM · EXECUTIVE COMMAND CENTER</div><h2>Dashboard</h2><p>What happened · What needs action · Where the money is</p></div>
       <div className="legacyQuick"><button className="primary" onClick={()=>setPage('projects')}>＋ Add Project</button><button className="secondary" onClick={()=>setPage('followups')}>◷ Follow Up</button><button className="secondary" onClick={()=>setPage('collections')}>₤ Collections</button></div>
     </div>
     <div className="legacyKpiGrid">
