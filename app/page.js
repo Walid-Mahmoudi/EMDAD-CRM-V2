@@ -175,12 +175,85 @@ function Dashboard({stats,projects,followups,setPage,setSelected}) {
   </div>
 }function Head({ey,title,sub,action}){return <div className="head"><div><small>{ey}</small><h1>{title}</h1><p>{sub}</p></div>{action}</div>}
 function Projects({rows,companies,setModal,setSelected,onArchive,onEdit}){
- const [tab,setTab]=useState('active'),[stage,setStage]=useState('all'),[type,setType]=useState('all'),[location,setLocation]=useState('all'),[sort,setSort]=useState('updated'),[q,setQ]=useState('');
- const activeStages=['Tender','Tender – High Probability','In Hand','Negotiation']; const active=rows.filter(p=>activeStages.includes(legacyStage(p))),lost=rows.filter(p=>legacyStage(p)==='Closed Lost'),won=rows.filter(p=>legacyStage(p)==='Closed Won'); const focus=active.filter(p=>['Tender – High Probability','In Hand','Negotiation'].includes(legacyStage(p))); const source=tab==='lost'?lost:tab==='won'?won:tab==='focus'?focus:active;
+ const [tab,setTab]=useState('active');
+ const [stage,setStage]=useState('all');
+ const [type,setType]=useState('all');
+ const [location,setLocation]=useState('all');
+ const [sort,setSort]=useState('updated');
+ const [q,setQ]=useState('');
+
+ const activeStages=['Tender','Tender – High Probability','In Hand','Negotiation'];
+ const active=rows.filter(p=>activeStages.includes(legacyStage(p)));
+ const lost=rows.filter(p=>legacyStage(p)==='Closed Lost');
+ const won=rows.filter(p=>legacyStage(p)==='Closed Won');
+ const focus=active.filter(p=>['Tender – High Probability','In Hand','Negotiation'].includes(legacyStage(p)));
+ const source=tab==='lost'?lost:tab==='won'?won:tab==='focus'?focus:active;
+
  const locations=[...new Set(source.map(p=>p.location).filter(Boolean))].sort();
- const filtered=source.filter(p=>{const s=legacyStage(p),loc=p.location||'';const hay=[p.name,p.project_code,p.status,p.sales_stage,p.location,companies.find(c=>c.id===p.company_id)?.name].join(' ').toLowerCase();return(stage==='all'||s===stage)&&(type==='all'||p.project_type===type)&&(location==='all'||loc===location)&&(!q||hay.includes(q.toLowerCase()))}).sort((a,b)=>sort==='value'?Number(b.estimated_value||0)-Number(a.estimated_value||0):sort==='probability'?Number(b.win_probability||0)-Number(a.win_probability||0):sort==='name'?String(a.name||'').localeCompare(String(b.name||'')):new Date(b.updated_at||b.created_at||0)-new Date(a.updated_at||a.created_at||0));
- const countStage=s=>active.filter(p=>legacyStage(p)===s).length; const valueStage=s=>active.filter(p=>legacyStage(p)===s).reduce((n,p)=>n+Number(p.estimated_value||0),0); const normalizeName=n=>String(n||'').trim().toLowerCase().replace(/\s+/g,' '); const groups=filtered.reduce((m,p)=>{const k=normalizeName(p.name)||p.id;if(!m[k])m[k]=[];m[k].push(p);return m},{}); const stageOptions=tab==='lost'?['Closed Lost']:tab==='won'?['Closed Won']:tab==='focus'?activeStages:['all',...activeStages];
-  return <><Head ey="CRM CORE" title="Projects" sub="Active pipeline, lost analysis, deals done and focus opportunities."/><div className="head-action"><button className="primary" onClick={()=>setModal('project')}>＋ New Project</button></div><div className="tabs card-tabs"><button className={tab==='active'?'active':''} onClick={()=>{setTab('active');setStage('all')}}>Active Pipeline <span>{active.length}</span></button><button className={tab==='lost'?'active':''} onClick={()=>{setTab('lost');setStage('Closed Lost')}}>Lost Analysis <span>{lost.length}</span></button><button className={tab==='won'?'active':''} onClick={()=>{setTab('won');setStage('Closed Won')}}>Deals Done <span>{won.length}</span></button><button className={tab==='focus'?'active':''} onClick={()=>{setTab('focus');setStage('all')}}>Focus Projects <span>{focus.length}</span></button></div>{tab==='active'&&<div className="kpis">{activeStages.map(s=><Kpi key={s} l={s} v={countStage(s)+' · '+money(valueStage(s))+' EGP'}/>)}</div>}<div className="card form2 project-filters"><label>Search<input value={q} onChange={e=>setQ(e.target.value)} placeholder="Project, client, code…"/></label><label>Stage<select value={stage} onChange={e=>setStage(e.target.value)}>{stageOptions.map(x=><option key={x} value={x}>{x==='all'?'All stages':x}</option>)}</select></label><label>Type<select value={type} onChange={e=>setType(e.target.value)}><option value="all">All types</option>{Object.entries(typeLabel).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label><label>Location<select value={location} onChange={e=>setLocation(e.target.value)}><option value="all">All locations</option>{locations.map(x=><option key={x} value={x}>{x}</option>)}</select></label><label>Sort<select value={sort} onChange={e=>setSort(e.target.value)}><option value="updated">Recently updated</option><option value="value">Estimated value</option><option value="probability">Win probability</option><option value="name">Project name</option></select></label></div><div className="card table"><div className="card-head"><b>{filtered.length} projects</b><span>{tab==='lost'?'Lost opportunities':tab==='won'?'Deals Done projects':tab==='focus'?'High-probability opportunities':'Commercial pipeline'}</span></div><table><thead><tr><th>Project</th><th>Client</th><th>Type</th><th>Current Action</th><th>Estimated</th><th>Probability</th><th>Next Follow-up</th><th></th></tr></thead><tbody>{Object.entries(groups).flatMap(([group,items])=>items.map((p,i)=><tr key={p.id} onClick={()=>setSelected(p)}>{i===0?<td rowSpan={items.length}><b>{p.name}</b>{items.length>1&&<small>{items.length} records with same normalized name</small>}<small>{p.project_code||'—'}</small></td>:null}<td>{companies.find(c=>c.id===p.company_id)?.name||'—'}</td><td>{typeLabel[p.project_type]||p.project_type||'—'}</td><td><label className="badge">{legacyStage(p)}</label></td><td>{money(p.estimated_value)} {p.currency||'EGP'}</td><td>{p.win_probability||0}%</td><td>{date(p.next_follow_up_date)}</td><td><button className="secondary small" onClick={e=>{e.stopPropagation();onEdit(p)}}>Edit</button> <button className="secondary small" onClick={e=>{e.stopPropagation();onArchive(p).catch(x=>alert(x.message))}}>Delete</button></td></tr>))}</tbody></table>{!filtered.length&&<Empty text="No projects match the current filters."/>}</div></>}
+ const filtered=source
+  .filter(p=>{
+   const s=legacyStage(p);
+   const loc=p.location||'';
+   const client=companies.find(c=>c.id===p.company_id)?.name||'';
+   const hay=[p.name,p.project_code,p.status,p.sales_stage,p.location,client].join(' ').toLowerCase();
+   return (stage==='all'||s===stage)
+    && (type==='all'||p.project_type===type)
+    && (location==='all'||loc===location)
+    && (!q||hay.includes(q.toLowerCase()));
+  })
+  .sort((a,b)=>{
+   if(sort==='value') return Number(b.estimated_value||0)-Number(a.estimated_value||0);
+   if(sort==='probability') return Number(b.win_probability||0)-Number(a.win_probability||0);
+   if(sort==='name') return String(a.name||'').localeCompare(String(b.name||''));
+   return new Date(b.updated_at||b.created_at||0)-new Date(a.updated_at||a.created_at||0);
+  });
+
+ const countStage=s=>active.filter(p=>legacyStage(p)===s).length;
+ const valueStage=s=>active.filter(p=>legacyStage(p)===s).reduce((n,p)=>n+Number(p.estimated_value||0),0);
+ const stageOptions=tab==='lost'?['Closed Lost']:tab==='won'?['Closed Won']:tab==='focus'?activeStages:['all',...activeStages];
+
+ return (
+  <>
+   <Head ey="CRM CORE" title="Projects" sub="Active pipeline, lost analysis, deals done and focus opportunities."/>
+   <div className="head-action"><button className="primary" onClick={()=>setModal('project')}>＋ New Project</button></div>
+   <div className="tabs card-tabs">
+    <button className={tab==='active'?'active':''} onClick={()=>{setTab('active');setStage('all')}}>Active Pipeline <span>{active.length}</span></button>
+    <button className={tab==='lost'?'active':''} onClick={()=>{setTab('lost');setStage('Closed Lost')}}>Lost Analysis <span>{lost.length}</span></button>
+    <button className={tab==='won'?'active':''} onClick={()=>{setTab('won');setStage('Closed Won')}}>Deals Done <span>{won.length}</span></button>
+    <button className={tab==='focus'?'active':''} onClick={()=>{setTab('focus');setStage('all')}}>Focus Projects <span>{focus.length}</span></button>
+   </div>
+   {tab==='active'&&<div className="kpis">{activeStages.map(s=><Kpi key={s} l={s} v={countStage(s)+' · '+money(valueStage(s))+' EGP'}/>)}</div>}
+   <div className="card form2 project-filters">
+    <label>Search<input value={q} onChange={e=>setQ(e.target.value)} placeholder="Project, client, code…"/></label>
+    <label>Stage<select value={stage} onChange={e=>setStage(e.target.value)}>{stageOptions.map(x=><option key={x} value={x}>{x==='all'?'All stages':x}</option>)}</select></label>
+    <label>Type<select value={type} onChange={e=>setType(e.target.value)}><option value="all">All types</option>{Object.entries(typeLabel).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label>
+    <label>Location<select value={location} onChange={e=>setLocation(e.target.value)}><option value="all">All locations</option>{locations.map(x=><option key={x} value={x}>{x}</option>)}</select></label>
+    <label>Sort<select value={sort} onChange={e=>setSort(e.target.value)}><option value="updated">Recently updated</option><option value="value">Estimated value</option><option value="probability">Win probability</option><option value="name">Project name</option></select></label>
+   </div>
+   <div className="card table">
+    <div className="card-head"><b>{filtered.length} projects</b><span>{tab==='lost'?'Lost opportunities':tab==='won'?'Deals Done projects':tab==='focus'?'High-probability opportunities':'Commercial pipeline'}</span></div>
+    <table><thead><tr><th>Project</th><th>Client</th><th>Type</th><th>Current Action</th><th>Estimated</th><th>Probability</th><th>Next Follow-up</th><th></th></tr></thead>
+     <tbody>
+      {filtered.map(p=>{
+       const client=companies.find(c=>c.id===p.company_id)?.name||'—';
+       return <tr key={p.id} onClick={()=>setSelected(p)}>
+        <td><b>{p.name}</b><small>{p.project_code||'—'}</small></td>
+        <td>{client}</td>
+        <td>{typeLabel[p.project_type]||p.project_type||'—'}</td>
+        <td><label className="badge">{legacyStage(p)}</label></td>
+        <td>{money(p.estimated_value)} {p.currency||'EGP'}</td>
+        <td>{p.win_probability||0}%</td>
+        <td>{date(p.next_follow_up_date)}</td>
+        <td><button className="secondary small" onClick={e=>{e.stopPropagation();onEdit(p)}}>Edit</button>{' '}<button className="secondary small" onClick={e=>{e.stopPropagation();onArchive(p).catch(x=>alert(x.message))}}>Delete</button></td>
+       </tr>;
+      })}
+     </tbody>
+    </table>
+    {!filtered.length&&<Empty text="No projects match the current filters."/>}
+   </div>
+  </>
+ );
+}
 function Focus({rows,companies,followups,setSelected}){
  const [q,setQ]=useState(''),[stage,setStage]=useState('all'),[health,setHealth]=useState('all'),[sort,setSort]=useState('value');
  const today=new Date();today.setHours(0,0,0,0);
