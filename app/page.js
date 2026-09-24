@@ -363,7 +363,8 @@ function Modal({type,companies,projects,onClose,save,initial={}}){
           <Field l="Contact name" k="name" req/>
           <div className="form2"><Select l="Client" k="company_id" opts={companies.map(c=>[c.id,c.name])} req/><Field l="Job title" k="job_title"/></div>
           <div className="form2"><Field l="Phone" k="phone"/><Field l="WhatsApp" k="whatsapp"/></div>
-          <Field l="Email" k="email" t="email"/>
+          <div className="form2"><Field l="Email" k="email" t="email"/><Select l="Contact Type" k="contact_type" opts={['Decision Maker','Owner','Consultant','Contractor','Procurement','Technical','Finance','Other'].map(x=>[x,x])}/></div>
+          <label>Notes<textarea value={f.notes||''} onChange={e=>set('notes',e.target.value)}/></label>
         </>}
 
         {type==='technical' && <>
