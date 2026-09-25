@@ -1,0 +1,4 @@
+-- EMDAD CRM V2 legacy parity completion
+-- Applied to Supabase project quprtdxhjfmiodbjvrsq as migration:
+-- 20260923 legacy_parity_workflow_completion_v1 + align_sales_stage_mutation_and_contract_insert_v1
+-- This file documents the production migration; the database migration is the source of truth.
